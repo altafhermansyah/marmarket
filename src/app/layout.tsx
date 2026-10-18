@@ -31,6 +31,22 @@ export default function RootLayout({
                 borderRadius: 6,
                 fontFamily: poppins.style.fontFamily,
               },
+              components: {
+                Menu: {
+                  itemBg: '#ffffff',
+                  subMenuItemBg: '#ffffff',
+                  itemColor: '#52525b',
+                  itemHoverBg: '#f4f4f5',
+                  itemHoverColor: '#18181b',
+                  itemSelectedBg: '#18181b',
+                  itemSelectedColor: '#ffffff',
+                  subMenuItemSelectedColor: '#18181b',
+                  itemActiveBg: '#27272a',
+                  itemBorderRadius: 6,
+                  itemMarginInline: 12,
+                  itemMarginBlock: 4,
+                },
+              },
             }}
           >
             {children}

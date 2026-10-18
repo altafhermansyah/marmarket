@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -13,6 +13,11 @@ import {
   Flex,
   message,
 } from 'antd';
+import {
+  loginAction,
+  registerAction,
+  getRolesAction,
+} from '@/actions/auth.actions';
 
 const { Title, Text } = Typography;
 
@@ -20,27 +25,69 @@ export default function AuthPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>('login');
   const [loading, setLoading] = useState<boolean>(false);
+  const [roles, setRoles] = useState<{ value: number; label: string }[]>([]);
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
-  const handleLoginFinish = (values: any) => {
+  useEffect(() => {
+    async function fetchRoles() {
+      const data = await getRolesAction();
+      if (data.length > 0) {
+        setRoles(
+          data.map((r) => ({
+            value: r.id_role,
+            label: r.nama_role,
+          }))
+        );
+      } else {
+        setRoles([
+          { value: 1, label: 'Admin' },
+          { value: 2, label: 'Kasir' },
+          { value: 3, label: 'Gudang' },
+        ]);
+      }
+    }
+    fetchRoles();
+  }, []);
+
+  const handleLoginFinish = async (values: {
+    username: string;
+    password: string;
+  }) => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      messageApi.success(`Login berhasil: ${values.username}`);
+    const res = await loginAction(values);
+    setLoading(false);
+
+    if (res.success) {
+      messageApi.success(res.message);
       router.push('/dashboard');
-    }, 500);
+      router.refresh();
+    } else {
+      messageApi.error(res.message);
+    }
   };
 
-  const handleRegisterFinish = (values: any) => {
+  const handleRegisterFinish = async (values: {
+    username: string;
+    password: string;
+    idrole: number;
+  }) => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      messageApi.success(`Register berhasil: ${values.username}`);
+    const res = await registerAction({
+      username: values.username,
+      password: values.password,
+      idrole: values.idrole,
+    });
+    setLoading(false);
+
+    if (res.success) {
+      messageApi.success(res.message);
       registerForm.resetFields();
       setActiveTab('login');
-    }, 500);
+    } else {
+      messageApi.error(res.message);
+    }
   };
 
   const LoginForm = (
@@ -112,15 +159,7 @@ export default function AuthPage() {
         name="idrole"
         rules={[{ required: true, message: 'Role wajib dipilih' }]}
       >
-        <Select
-          placeholder="Pilih role"
-          size="large"
-          options={[
-            { value: 1, label: 'Super Admin' },
-            { value: 2, label: 'Admin Gudang' },
-            { value: 3, label: 'Kasir' },
-          ]}
-        />
+        <Select placeholder="Pilih role" size="large" options={roles} />
       </Form.Item>
 
       <Form.Item
