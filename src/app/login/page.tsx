@@ -133,79 +133,79 @@ export default function AuthPage() {
     </Form>
   );
 
-  const RegisterForm = (
-    <Form
-      form={registerForm}
-      name="register_form"
-      layout="vertical"
-      onFinish={handleRegisterFinish}
-      autoComplete="off"
-      requiredMark={false}
-      style={{ marginTop: 8 }}
-    >
-      <Form.Item
-        label="Username"
-        name="username"
-        rules={[
-          { required: true, message: 'Username wajib diisi' },
-          { max: 45, message: 'Maksimal 45 karakter' },
-        ]}
-      >
-        <Input placeholder="Masukkan username" size="large" />
-      </Form.Item>
+  // const RegisterForm = (
+  //   <Form
+  //     form={registerForm}
+  //     name="register_form"
+  //     layout="vertical"
+  //     onFinish={handleRegisterFinish}
+  //     autoComplete="off"
+  //     requiredMark={false}
+  //     style={{ marginTop: 8 }}
+  //   >
+  //     <Form.Item
+  //       label="Username"
+  //       name="username"
+  //       rules={[
+  //         { required: true, message: 'Username wajib diisi' },
+  //         { max: 45, message: 'Maksimal 45 karakter' },
+  //       ]}
+  //     >
+  //       <Input placeholder="Masukkan username" size="large" />
+  //     </Form.Item>
 
-      <Form.Item
-        label="Role"
-        name="idrole"
-        rules={[{ required: true, message: 'Role wajib dipilih' }]}
-      >
-        <Select placeholder="Pilih role" size="large" options={roles} />
-      </Form.Item>
+  //     <Form.Item
+  //       label="Role"
+  //       name="idrole"
+  //       rules={[{ required: true, message: 'Role wajib dipilih' }]}
+  //     >
+  //       <Select placeholder="Pilih role" size="large" options={roles} />
+  //     </Form.Item>
 
-      <Form.Item
-        label="Password"
-        name="password"
-        rules={[
-          { required: true, message: 'Password wajib diisi' },
-          { min: 6, message: 'Minimal 6 karakter' },
-          { max: 100, message: 'Maksimal 100 karakter' },
-        ]}
-      >
-        <Input.Password placeholder="Masukkan password" size="large" />
-      </Form.Item>
+  //     <Form.Item
+  //       label="Password"
+  //       name="password"
+  //       rules={[
+  //         { required: true, message: 'Password wajib diisi' },
+  //         { min: 6, message: 'Minimal 6 karakter' },
+  //         { max: 100, message: 'Maksimal 100 karakter' },
+  //       ]}
+  //     >
+  //       <Input.Password placeholder="Masukkan password" size="large" />
+  //     </Form.Item>
 
-      <Form.Item
-        label="Konfirmasi Password"
-        name="confirm_password"
-        dependencies={['password']}
-        rules={[
-          { required: true, message: 'Konfirmasi password wajib diisi' },
-          ({ getFieldValue }) => ({
-            validator(_, value) {
-              if (!value || getFieldValue('password') === value) {
-                return Promise.resolve();
-              }
-              return Promise.reject(new Error('Password tidak sama'));
-            },
-          }),
-        ]}
-      >
-        <Input.Password placeholder="Ulangi password" size="large" />
-      </Form.Item>
+  //     <Form.Item
+  //       label="Konfirmasi Password"
+  //       name="confirm_password"
+  //       dependencies={['password']}
+  //       rules={[
+  //         { required: true, message: 'Konfirmasi password wajib diisi' },
+  //         ({ getFieldValue }) => ({
+  //           validator(_, value) {
+  //             if (!value || getFieldValue('password') === value) {
+  //               return Promise.resolve();
+  //             }
+  //             return Promise.reject(new Error('Password tidak sama'));
+  //           },
+  //         }),
+  //       ]}
+  //     >
+  //       <Input.Password placeholder="Ulangi password" size="large" />
+  //     </Form.Item>
 
-      <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
-        <Button
-          type="primary"
-          htmlType="submit"
-          size="large"
-          loading={loading}
-          block
-        >
-          Register
-        </Button>
-      </Form.Item>
-    </Form>
-  );
+  //     <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+  //       <Button
+  //         type="primary"
+  //         htmlType="submit"
+  //         size="large"
+  //         loading={loading}
+  //         block
+  //       >
+  //         Register
+  //       </Button>
+  //     </Form.Item>
+  //   </Form>
+  // );
 
   return (
     <Flex
@@ -251,11 +251,11 @@ export default function AuthPage() {
               label: 'Login',
               children: LoginForm,
             },
-            {
-              key: 'register',
-              label: 'Register',
-              children: RegisterForm,
-            },
+            // {
+            //   key: 'register',
+            //   label: 'Register',
+            //   children: RegisterForm,
+            // },
           ]}
         />
       </Card>
