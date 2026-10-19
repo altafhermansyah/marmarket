@@ -79,7 +79,7 @@ export default function DashboardOverviewPage() {
       <Card
         title={
           <Text strong style={{ fontSize: 14 }}>
-            Modul 6 Tabel Master (Database Views)
+            6 Tabel Master (Database Views)
           </Text>
         }
         style={{

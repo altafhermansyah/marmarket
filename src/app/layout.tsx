@@ -46,6 +46,20 @@ export default function RootLayout({
                   itemMarginInline: 12,
                   itemMarginBlock: 4,
                 },
+                Select: {
+                  optionSelectedBg: '#18181b',
+                  optionSelectedColor: '#ffffff',
+                  optionSelectedFontWeight: 500,
+                  optionActiveBg: '#f4f4f5',
+                },
+                Segmented: {
+                  trackBg: '#f4f4f5',
+                  itemColor: '#52525b',
+                  itemHoverColor: '#18181b',
+                  itemHoverBg: 'transparent',
+                  itemSelectedBg: '#ffffff',
+                  itemSelectedColor: '#18181b',
+                },
               },
             }}
           >
