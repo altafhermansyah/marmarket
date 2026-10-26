@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Row, Col, Typography, Flex, Button } from 'antd';
 import { getDashboardStatsAction } from '@/actions/dashboard.actions';
+import { formatRupiah } from '@/lib/format';
 
 const { Title, Text } = Typography;
 
@@ -14,6 +15,10 @@ export default function DashboardOverviewPage() {
     vendorAktif: 0,
     totalUser: 0,
     satuanAktif: 0,
+    totalPengadaan: 0,
+    totalPenerimaan: 0,
+    totalPenjualan: 0,
+    totalOmset: 0,
   });
 
   useEffect(() => {
@@ -27,8 +32,35 @@ export default function DashboardOverviewPage() {
   const summaryItems = [
     { label: 'Barang Aktif', value: stats.barangAktif },
     { label: 'Vendor Aktif', value: stats.vendorAktif },
-    { label: 'Satuan Aktif', value: stats.satuanAktif },
-    { label: 'Total User', value: stats.totalUser },
+    { label: 'Total Transaksi Penjualan', value: stats.totalPenjualan },
+    { label: 'Total Omset Penjualan', value: formatRupiah(stats.totalOmset) },
+  ];
+
+  const transactionShortcuts = [
+    {
+      title: 'Transaksi Pengadaan',
+      headerView: 'vu_pengadaan',
+      detailView: 'vu_detail_pengadaan',
+      path: '/dashboard/transaksi/pengadaan',
+      count: stats.totalPengadaan,
+      description: 'Pengadaan barang ke vendor dengan kalkulasi PPN & subtotal',
+    },
+    {
+      title: 'Transaksi Penerimaan',
+      headerView: 'vu_penerimaan',
+      detailView: 'vu_detail_penerimaan',
+      path: '/dashboard/transaksi/penerimaan',
+      count: stats.totalPenerimaan,
+      description: 'Pencatatan barang masuk dari PO vendor & penambahan stok',
+    },
+    {
+      title: 'Transaksi Penjualan (POS)',
+      headerView: 'vu_penjualan',
+      detailView: 'vu_detail_penjualan',
+      path: '/dashboard/transaksi/penjualan',
+      count: stats.totalPenjualan,
+      description: 'Kasir penjualan dengan kalkulasi margin keuntungan & PPN',
+    },
   ];
 
   const masterShortcuts = [
@@ -47,7 +79,7 @@ export default function DashboardOverviewPage() {
           Overview
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>
-          Ringkasan data master Marmarket berdasarkan View database
+          Ringkasan data master dan transaksi Marmarket berdasarkan Database Views
         </Text>
       </Flex>
 
@@ -66,7 +98,7 @@ export default function DashboardOverviewPage() {
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {item.label}
                 </Text>
-                <Title level={2} style={{ margin: 0, fontWeight: 600 }}>
+                <Title level={3} style={{ margin: 0, fontWeight: 600 }}>
                   {item.value}
                 </Title>
               </Flex>
@@ -74,6 +106,78 @@ export default function DashboardOverviewPage() {
           </Col>
         ))}
       </Row>
+
+      {/* Navigasi Cepat Modul Transaksi (Views Baru) */}
+      <Card
+        title={
+          <Flex vertical gap={2}>
+            <Text strong style={{ fontSize: 14 }}>
+              Modul Transaksi (Database Views)
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
+              Terintegrasi dengan 6 Database Views: vu_pengadaan, vu_detail_pengadaan, vu_penerimaan, vu_detail_penerimaan, vu_penjualan, vu_detail_penjualan
+            </Text>
+          </Flex>
+        }
+        style={{
+          border: '1px solid #e4e4e7',
+          boxShadow: 'none',
+        }}
+      >
+        <Row gutter={[16, 16]}>
+          {transactionShortcuts.map((t) => (
+            <Col xs={24} md={8} key={t.path}>
+              <Card
+                size="small"
+                style={{
+                  border: '1px solid #e4e4e7',
+                  backgroundColor: '#ffffff',
+                  height: '100%',
+                }}
+                styles={{
+                  body: {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    height: '100%',
+                    gap: 12,
+                  },
+                }}
+              >
+                <Flex vertical gap={6}>
+                  <Flex justify="space-between" align="center">
+                    <Text strong style={{ fontSize: 14 }}>
+                      {t.title}
+                    </Text>
+                    <Text strong style={{ color: '#0284c7' }}>
+                      {t.count} Data
+                    </Text>
+                  </Flex>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {t.description}
+                  </Text>
+                  <Flex vertical gap={2} style={{ marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      Header: <Text code>{t.headerView}</Text>
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      Detail: <Text code>{t.detailView}</Text>
+                    </Text>
+                  </Flex>
+                </Flex>
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() => router.push(t.path)}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  Buka Transaksi
+                </Button>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
       {/* Navigasi Cepat 6 Tabel Master */}
       <Card
