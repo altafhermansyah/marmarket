@@ -124,4 +124,25 @@ export interface DetailPenerimaanView {
   jumlah_terima: number;
   harga_satuan_terima: number;
   sub_total_terima: number;
-}
+}
+
+// 13. Progress Penerimaan Pengadaan (Bertahap)
+export interface PengadaanPenerimaanProgressView extends PengadaanView {
+  total_item_pesan: number;
+  total_item_terima: number;
+  sisa_item: number;
+}
+
+// 14. Item Detail Pengadaan dengan info sisa untuk penerimaan
+export interface DetailPengadaanPenerimaanItem {
+  id_detail_pengadaan: number;
+  id_pengadaan: number;
+  id_barang: number;
+  nama_barang: string;
+  nama_satuan: string;
+  harga_satuan: number;
+  jumlah_pesan: number;
+  sudah_diterima: number;
+  sisa_belum_diterima: number;
+}
+

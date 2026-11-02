@@ -79,12 +79,14 @@ export interface BarangStokItem {
   nama_barang: string;
   jenis: string;
   nama_satuan: string;
-  harga: number;
-  stok: number;
+  harga: number; // harga dasar
+  harga_jual: number; // harga jual dari Function fn_hitung_harga_jual
+  stok: number; // stok dari Function fn_cek_stok
 }
 
 export async function getBarangWithStockAction(): Promise<BarangStokItem[]> {
   try {
+    // Memanfaatkan Function fn_hitung_harga_jual dan fn_cek_stok
     const sql = `
       SELECT 
         b.id_barang, 
@@ -92,37 +94,61 @@ export async function getBarangWithStockAction(): Promise<BarangStokItem[]> {
         b.jenis, 
         b.nama_satuan, 
         b.harga, 
-        COALESCE(ks.stock, 0) AS stok 
+        fn_hitung_harga_jual(b.id_barang) AS harga_jual,
+        fn_cek_stok(b.id_barang) AS stok 
       FROM vu_barang_aktif b 
-      LEFT JOIN (
-        SELECT k1.idbarang, k1.stock 
-        FROM kartu_stok k1 
-        INNER JOIN (
-          SELECT idbarang, MAX(idkartu_stok) as max_id 
-          FROM kartu_stok 
-          GROUP BY idbarang
-        ) k2 ON k1.idkartu_stok = k2.max_id
-      ) ks ON b.id_barang = ks.idbarang 
       ORDER BY b.nama_barang ASC
     `;
     const [rows] = await db.query<RowDataPacket[]>(sql);
-    return rows as BarangStokItem[];
+    return rows.map((r) => ({
+      id_barang: Number(r.id_barang),
+      nama_barang: String(r.nama_barang),
+      jenis: String(r.jenis),
+      nama_satuan: String(r.nama_satuan),
+      harga: Number(r.harga),
+      harga_jual: Number(r.harga_jual),
+      stok: Number(r.stok),
+    }));
   } catch (error) {
     console.error('Gagal mengambil barang beserta stok:', error);
     return [];
   }
 }
 
+export async function cekStokBarangAction(idbarang: number): Promise<number> {
+  try {
+    const [rows] = await db.query<RowDataPacket[]>(
+      'SELECT fn_cek_stok(?) AS stok',
+      [idbarang]
+    );
+    return rows.length > 0 ? Number(rows[0].stok) : 0;
+  } catch (error) {
+    console.error('Gagal menjalankan fn_cek_stok:', error);
+    return 0;
+  }
+}
+
+export async function hitungHargaJualAction(idbarang: number): Promise<number> {
+  try {
+    const [rows] = await db.query<RowDataPacket[]>(
+      'SELECT fn_hitung_harga_jual(?) AS harga_jual',
+      [idbarang]
+    );
+    return rows.length > 0 ? Number(rows[0].harga_jual) : 0;
+  } catch (error) {
+    console.error('Gagal menjalankan fn_hitung_harga_jual:', error);
+    return 0;
+  }
+}
+
 export interface CreatePenjualanItemInput {
   idbarang: number;
   nama_barang?: string;
-  harga_satuan: number;
   jumlah: number;
 }
 
 export async function createPenjualanAction(data: {
   idmargin: number;
-  ppn_percent?: number;
   items: CreatePenjualanItemInput[];
 }) {
   const connection = await db.getConnection();
@@ -132,7 +158,7 @@ export async function createPenjualanAction(data: {
       return { success: false, message: 'Sesi habis, silakan login kembali' };
     }
 
-    const { idmargin, ppn_percent = 11, items } = data;
+    const { idmargin, items } = data;
 
     if (!items || items.length === 0) {
       return { success: false, message: 'Daftar barang penjualan tidak boleh kosong' };
@@ -140,7 +166,7 @@ export async function createPenjualanAction(data: {
 
     await connection.beginTransaction();
 
-    // 1. Cek ketersediaan stok tiap barang
+    // 1. Cek ketersediaan stok tiap barang menggunakan Function fn_cek_stok
     for (const item of items) {
       if (item.jumlah <= 0) {
         await connection.rollback();
@@ -148,10 +174,7 @@ export async function createPenjualanAction(data: {
       }
 
       const [stockRows] = await connection.query<RowDataPacket[]>(
-        `SELECT stock FROM kartu_stok 
-         WHERE idbarang = ? 
-         ORDER BY idkartu_stok DESC 
-         LIMIT 1`,
+        'SELECT fn_cek_stok(?) AS stock',
         [item.idbarang]
       );
 
@@ -160,66 +183,47 @@ export async function createPenjualanAction(data: {
         await connection.rollback();
         return {
           success: false,
-          message: `Stok barang ${item.nama_barang || `#${item.idbarang}`} tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${item.jumlah})`,
+          message: `Stok barang "${item.nama_barang || `#${item.idbarang}`}" tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${item.jumlah})`,
         };
       }
     }
 
-    // 2. Hitung subtotal, ppn, dan total
-    const subtotal = items.reduce(
-      (acc, item) => acc + item.harga_satuan * item.jumlah,
-      0
-    );
-    const ppn = Math.round(subtotal * (ppn_percent / 100));
-    const total = subtotal + ppn;
-
-    // 3. Simpan Header Penjualan
+    // 2. Simpan Header Penjualan
+    // Nilai subtotal, ppn, dan total_nilai akan dihitung dan diupdate otomatis oleh TRIGGER trg_after_insert_detail_penjualan
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO penjualan (subtotal_nilai, ppn, total_nilai, iduser, idmargin_penjualan) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [subtotal, ppn, total, session.id_user, idmargin]
+       VALUES (0, 0, 0, ?, ?)`,
+      [session.id_user, idmargin]
     );
 
     const idpenjualan = headerResult.insertId;
 
-    // 4. Simpan Detail Penjualan dan Catat Pengurangan Stok (Jenis 'K' = Keluar)
+    // 3. Simpan Detail Penjualan menggunakan Stored Procedure sp_tambah_detail_penjualan
+    // Yang otomatis menghitung harga jual via fn_hitung_harga_jual
+    // Dan memicu TRIGGER trg_after_insert_detail_penjualan untuk mencatat mutasi 'K' ke kartu_stok serta update total nota
     for (const item of items) {
-      const itemSubtotal = item.harga_satuan * item.jumlah;
-
-      await connection.execute<ResultSetHeader>(
-        `INSERT INTO detail_penjualan (harga_satuan, jumlah, subtotal, penjualan_idpenjualan, idbarang) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [item.harga_satuan, item.jumlah, itemSubtotal, idpenjualan, item.idbarang]
-      );
-
-      // Ambil stok terakhir
-      const [stockRows] = await connection.query<RowDataPacket[]>(
-        `SELECT stock FROM kartu_stok 
-         WHERE idbarang = ? 
-         ORDER BY idkartu_stok DESC 
-         LIMIT 1`,
-        [item.idbarang]
-      );
-
-      const currentStock = stockRows.length > 0 ? Number(stockRows[0].stock) : 0;
-      const nextStock = currentStock - item.jumlah;
-
-      // Catat di kartu_stok
-      await connection.execute<ResultSetHeader>(
-        `INSERT INTO kartu_stok (jenis_transaksi, masuk, keluar, stock, idtransaksi, idbarang) 
-         VALUES ('K', 0, ?, ?, ?, ?)`,
-        [item.jumlah, nextStock, idpenjualan, item.idbarang]
+      await connection.query(
+        `CALL sp_tambah_detail_penjualan(?, ?, ?)`,
+        [idpenjualan, item.idbarang, item.jumlah]
       );
     }
+
+    // 4. Ambil total_nilai yang telah diupdate oleh trigger
+    const [penjualanUpdated] = await connection.query<RowDataPacket[]>(
+      'SELECT total_nilai FROM penjualan WHERE idpenjualan = ?',
+      [idpenjualan]
+    );
+    const finalTotal = penjualanUpdated.length > 0 ? Number(penjualanUpdated[0].total_nilai) : 0;
 
     await connection.commit();
 
     revalidatePath('/dashboard/transaksi/penjualan');
+    revalidatePath('/dashboard');
     return {
       success: true,
       message: `Penjualan #${idpenjualan} berhasil disimpan`,
       id_penjualan: idpenjualan,
-      total_nilai: total,
+      total_nilai: finalTotal,
     };
   } catch (error) {
     await connection.rollback();

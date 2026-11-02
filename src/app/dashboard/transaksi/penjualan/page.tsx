@@ -146,9 +146,8 @@ export default function PenjualanPage() {
     const selected = availableBarang.find((b) => b.id_barang === idbarang);
     if (!selected) return;
 
-    const marginPct = activeMargin?.persen || 0;
-    // Harga jual = harga dasar + margin
-    const hargaJual = Math.round(selected.harga * (1 + marginPct / 100));
+    // Gunakan harga_jual yang dihitung otomatis oleh Function fn_hitung_harga_jual
+    const hargaJual = selected.harga_jual;
 
     setCartItems((prev) =>
       prev.map((item) => {
@@ -219,11 +218,9 @@ export default function PenjualanPage() {
       setSubmitting(true);
       const res = await createPenjualanAction({
         idmargin: activeMargin.id_margin,
-        ppn_percent: ppnPercent,
         items: validItems.map((i) => ({
           idbarang: i.idbarang,
           nama_barang: i.nama_barang,
-          harga_satuan: i.harga_satuan,
           jumlah: i.jumlah,
         })),
       });

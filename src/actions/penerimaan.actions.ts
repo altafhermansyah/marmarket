@@ -2,10 +2,16 @@
 
 import { db } from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { PenerimaanView, DetailPenerimaanView, PengadaanView, DetailPengadaanView } from '@/types/database';
+import {
+  PenerimaanView,
+  DetailPenerimaanView,
+  PengadaanPenerimaanProgressView,
+  DetailPengadaanPenerimaanItem,
+} from '@/types/database';
 import { getSessionAction } from '@/actions/auth.actions';
 import { revalidatePath } from 'next/cache';
 
+// 1. Ambil riwayat penerimaan dari view vu_penerimaan
 export async function getPenerimaanViewAction(): Promise<PenerimaanView[]> {
   try {
     const [rows] = await db.query<RowDataPacket[]>(
@@ -29,6 +35,7 @@ export async function getPenerimaanViewAction(): Promise<PenerimaanView[]> {
   }
 }
 
+// 2. Ambil detail barang dari suatu nota penerimaan
 export async function getDetailPenerimaanViewAction(
   idPenerimaan: number
 ): Promise<DetailPenerimaanView[]> {
@@ -55,11 +62,13 @@ export async function getDetailPenerimaanViewAction(
   }
 }
 
-// Ambil pengadaan yang masih berstatus proses/aktif dan belum pernah diterima penuh
-export async function getPengadaanSiapTerimaAction(): Promise<PengadaanView[]> {
+// 3. Ambil daftar Pengadaan beserta progress penerimaan bertahapnya
+export async function getPengadaanPenerimaanProgressAction(): Promise<
+  PengadaanPenerimaanProgressView[]
+> {
   try {
-    const [rows] = await db.query<RowDataPacket[]>(
-      `SELECT 
+    const sql = `
+      SELECT 
         p.id_pengadaan, 
         p.tanggal_pengadaan, 
         p.id_user, 
@@ -70,25 +79,95 @@ export async function getPengadaanSiapTerimaAction(): Promise<PengadaanView[]> {
         p.status, 
         p.subtotal_nilai, 
         p.ppn, 
-        p.total_nilai 
+        p.total_nilai,
+        CAST(COALESCE((
+          SELECT SUM(jumlah) 
+          FROM detail_pengadaan 
+          WHERE idpengadaan = p.id_pengadaan
+        ), 0) AS SIGNED) AS total_item_pesan,
+        CAST(COALESCE((
+          SELECT SUM(dpn.jumlah_terima) 
+          FROM detail_penerimaan dpn 
+          JOIN penerimaan pn ON dpn.idpenerimaan = pn.idpenerimaan 
+          WHERE pn.idpengadaan = p.id_pengadaan
+        ), 0) AS SIGNED) AS total_item_terima,
+        CAST(
+          COALESCE((SELECT SUM(jumlah) FROM detail_pengadaan WHERE idpengadaan = p.id_pengadaan), 0) -
+          COALESCE((SELECT SUM(dpn.jumlah_terima) FROM detail_penerimaan dpn JOIN penerimaan pn ON dpn.idpenerimaan = pn.idpenerimaan WHERE pn.idpengadaan = p.id_pengadaan), 0)
+        AS SIGNED) AS sisa_item
       FROM vu_pengadaan p
-      WHERE p.status NOT IN ('B', 'S')
-        AND p.id_pengadaan NOT IN (SELECT idpengadaan FROM penerimaan)
-      ORDER BY p.id_pengadaan DESC`
-    );
-    return rows as PengadaanView[];
+      WHERE p.status != 'B'
+      ORDER BY p.id_pengadaan DESC
+    `;
+    const [rows] = await db.query<RowDataPacket[]>(sql);
+    return rows as PengadaanPenerimaanProgressView[];
+  } catch (error) {
+    console.error('Gagal mengambil pengadaan progress penerimaan:', error);
+    return [];
+  }
+}
+
+// 4. Ambil pengadaan yang masih memiliki sisa barang untuk diterima (Bisa bertahap)
+export async function getPengadaanSiapTerimaAction(): Promise<
+  PengadaanPenerimaanProgressView[]
+> {
+  try {
+    const all = await getPengadaanPenerimaanProgressAction();
+    return all.filter((p) => p.status !== 'S' && p.sisa_item > 0);
   } catch (error) {
     console.error('Gagal mengambil pengadaan siap terima:', error);
     return [];
   }
 }
 
+// 5. Ambil item-item pengadaan untuk proses penerimaan bertahap (menghitung sisa per barang)
+export async function getDetailPengadaanForPenerimaanAction(
+  idPengadaan: number
+): Promise<DetailPengadaanPenerimaanItem[]> {
+  try {
+    const sql = `
+      SELECT 
+        dp.iddetail_pengadaan AS id_detail_pengadaan,
+        dp.idpengadaan AS id_pengadaan,
+        dp.idbarang AS id_barang,
+        b.nama AS nama_barang,
+        s.nama_satuan,
+        dp.harga_satuan,
+        dp.jumlah AS jumlah_pesan,
+        CAST(COALESCE((
+          SELECT SUM(dpn.jumlah_terima)
+          FROM detail_penerimaan dpn
+          JOIN penerimaan pn ON dpn.idpenerimaan = pn.idpenerimaan
+          WHERE pn.idpengadaan = dp.idpengadaan AND dpn.barang_idbarang = dp.idbarang
+        ), 0) AS SIGNED) AS sudah_diterima,
+        CAST(dp.jumlah - COALESCE((
+          SELECT SUM(dpn.jumlah_terima)
+          FROM detail_penerimaan dpn
+          JOIN penerimaan pn ON dpn.idpenerimaan = pn.idpenerimaan
+          WHERE pn.idpengadaan = dp.idpengadaan AND dpn.barang_idbarang = dp.idbarang
+        ), 0) AS SIGNED) AS sisa_belum_diterima
+      FROM detail_pengadaan dp
+      JOIN barang b ON dp.idbarang = b.idbarang
+      JOIN satuan s ON b.idsatuan = s.idsatuan
+      WHERE dp.idpengadaan = ?
+      ORDER BY dp.iddetail_pengadaan ASC
+    `;
+    const [rows] = await db.query<RowDataPacket[]>(sql, [idPengadaan]);
+    return rows as DetailPengadaanPenerimaanItem[];
+  } catch (error) {
+    console.error('Gagal mengambil detail pengadaan for penerimaan:', error);
+    return [];
+  }
+}
+
 export interface CreatePenerimaanItemInput {
   idbarang: number;
+  nama_barang?: string;
   jumlah_terima: number;
   harga_satuan_terima: number;
 }
 
+// 6. Buat transaksi penerimaan barang (Mendukung Penerimaan Bertahap)
 export async function createPenerimaanAction(data: {
   idpengadaan: number;
   items: CreatePenerimaanItemInput[];
@@ -102,22 +181,42 @@ export async function createPenerimaanAction(data: {
 
     const { idpengadaan, items } = data;
 
-    if (!items || items.length === 0) {
-      return { success: false, message: 'Daftar barang penerimaan tidak boleh kosong' };
+    // Filter item yang jumlah terimanya > 0
+    const activeItems = (items || []).filter((i) => i.jumlah_terima > 0);
+
+    if (activeItems.length === 0) {
+      return {
+        success: false,
+        message: 'Minimal harus ada 1 barang yang diterima dengan jumlah lebih dari 0',
+      };
     }
 
-    for (const item of items) {
-      if (!item.idbarang || item.jumlah_terima <= 0 || item.harga_satuan_terima < 0) {
+    // Validasi sisa belum diterima dari database
+    const pendingItems = await getDetailPengadaanForPenerimaanAction(idpengadaan);
+    const pendingMap = new Map<number, DetailPengadaanPenerimaanItem>();
+    for (const item of pendingItems) {
+      pendingMap.set(item.id_barang, item);
+    }
+
+    for (const item of activeItems) {
+      const match = pendingMap.get(item.idbarang);
+      if (!match) {
         return {
           success: false,
-          message: 'Jumlah terima harus lebih dari 0 dan harga satuan tidak boleh negatif',
+          message: `Barang "${item.nama_barang || `#${item.idbarang}`}" tidak terdaftar pada Pengadaan #${idpengadaan}`,
+        };
+      }
+      if (item.jumlah_terima > match.sisa_belum_diterima) {
+        return {
+          success: false,
+          message: `Jumlah terima untuk "${match.nama_barang}" (${item.jumlah_terima}) melebihi sisa pesanan (${match.sisa_belum_diterima})`,
         };
       }
     }
 
     await connection.beginTransaction();
 
-    // 1. Simpan Header Penerimaan (Status 'S' = Selesai/Diterima)
+    // 1. Simpan Header Penerimaan (Status 'S' = Tercatat)
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO penerimaan (status, idpengadaan, iduser) 
        VALUES ('S', ?, ?)`,
@@ -126,49 +225,25 @@ export async function createPenerimaanAction(data: {
 
     const idpenerimaan = headerResult.insertId;
 
-    // 2. Simpan Item Detail Penerimaan & Catat ke Kartu Stok (Jenis 'M' = Masuk)
-    for (const item of items) {
-      const subtotalTerima = item.harga_satuan_terima * item.jumlah_terima;
-
-      await connection.execute<ResultSetHeader>(
-        `INSERT INTO detail_penerimaan (idpenerimaan, barang_idbarang, jumlah_terima, harga_satuan_terima, sub_total_terima) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [idpenerimaan, item.idbarang, item.jumlah_terima, item.harga_satuan_terima, subtotalTerima]
-      );
-
-      // Hitung stok terakhir dari kartu_stok
-      const [lastStockRows] = await connection.query<RowDataPacket[]>(
-        `SELECT stock FROM kartu_stok 
-         WHERE idbarang = ? 
-         ORDER BY idkartu_stok DESC 
-         LIMIT 1`,
-        [item.idbarang]
-      );
-
-      const prevStock = lastStockRows.length > 0 ? Number(lastStockRows[0].stock) : 0;
-      const nextStock = prevStock + Number(item.jumlah_terima);
-
-      // Catat ke kartu_stok
-      await connection.execute<ResultSetHeader>(
-        `INSERT INTO kartu_stok (jenis_transaksi, masuk, keluar, stock, idtransaksi, idbarang) 
-         VALUES ('M', ?, 0, ?, ?, ?)`,
-        [item.jumlah_terima, nextStock, idpenerimaan, item.idbarang]
+    // 2. Simpan Item Detail Penerimaan memanggil Stored Procedure sp_tambah_detail_penerimaan
+    // TRIGGER trg_after_insert_detail_penerimaan akan otomatis:
+    // A. Menghitung stok baru via fn_cek_stok dan mencatat mutasi 'M' ke kartu_stok
+    // B. Menghitung total_terima vs total_pesan; jika sudah lengkap, otomatis update status pengadaan menjadi 'S' (Selesai)
+    for (const item of activeItems) {
+      await connection.query(
+        `CALL sp_tambah_detail_penerimaan(?, ?, ?, ?)`,
+        [idpenerimaan, item.idbarang, item.jumlah_terima, item.harga_satuan_terima]
       );
     }
-
-    // 3. Update Status Pengadaan menjadi 'S' (Selesai)
-    await connection.execute<ResultSetHeader>(
-      "UPDATE pengadaan SET status = 'S' WHERE idpengadaan = ?",
-      [idpengadaan]
-    );
 
     await connection.commit();
 
     revalidatePath('/dashboard/transaksi/penerimaan');
     revalidatePath('/dashboard/transaksi/pengadaan');
+    revalidatePath('/dashboard');
     return {
       success: true,
-      message: `Penerimaan #${idpenerimaan} berhasil dicatat dan stok barang diperbarui`,
+      message: `Penerimaan #${idpenerimaan} berhasil dicatat. Stok barang di kartu stok otomatis bertambah!`,
       id_penerimaan: idpenerimaan,
     };
   } catch (error) {

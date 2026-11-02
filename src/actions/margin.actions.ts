@@ -23,6 +23,25 @@ export async function getMarginViewAction(
   }
 }
 
+export async function setMarginAktifAction(persen: number) {
+  try {
+    const session = await getSessionAction();
+    if (!session) {
+      return { success: false, message: 'Sesi habis, silakan login kembali' };
+    }
+
+    // Panggil Stored Procedure sp_set_margin_aktif
+    await db.query('CALL sp_set_margin_aktif(?, ?)', [persen, session.id_user]);
+
+    revalidatePath('/dashboard/master/margin');
+    revalidatePath('/dashboard/transaksi/penjualan');
+    return { success: true, message: `Margin aktif berhasil diset menjadi ${persen}%` };
+  } catch (error) {
+    console.error('Gagal menjalankan sp_set_margin_aktif:', error);
+    return { success: false, message: 'Gagal mengatur margin aktif' };
+  }
+}
+
 export async function createMarginAction(data: {
   persen: number;
   status: number;
@@ -36,15 +55,17 @@ export async function createMarginAction(data: {
     const { persen, status } = data;
 
     if (status === 1) {
-      await db.execute('UPDATE margin_penjualan SET status = 0 WHERE status = 1');
+      // Gunakan Stored Procedure sp_set_margin_aktif
+      await db.query('CALL sp_set_margin_aktif(?, ?)', [persen, session.id_user]);
+    } else {
+      await db.execute<ResultSetHeader>(
+        'INSERT INTO margin_penjualan (persen, status, iduser, created_at) VALUES (?, 0, ?, NOW())',
+        [persen, session.id_user]
+      );
     }
 
-    await db.execute<ResultSetHeader>(
-      'INSERT INTO margin_penjualan (persen, status, iduser, created_at) VALUES (?, ?, ?, NOW())',
-      [persen, status, session.id_user]
-    );
-
     revalidatePath('/dashboard/master/margin');
+    revalidatePath('/dashboard/transaksi/penjualan');
     return { success: true, message: 'Margin penjualan berhasil ditambahkan' };
   } catch (error) {
     console.error('Gagal menambah margin:', error);
@@ -68,18 +89,17 @@ export async function updateMarginAction(
     const { persen, status } = data;
 
     if (status === 1) {
-      await db.execute(
-        'UPDATE margin_penjualan SET status = 0 WHERE status = 1 AND idmargin_penjualan != ?',
-        [id_margin]
+      // Mengaktifkan margin baru/terpilih melalui Stored Procedure
+      await db.query('CALL sp_set_margin_aktif(?, ?)', [persen, session.id_user]);
+    } else {
+      await db.execute<ResultSetHeader>(
+        'UPDATE margin_penjualan SET persen = ?, status = ?, iduser = ?, updated_at = NOW() WHERE idmargin_penjualan = ?',
+        [persen, status, session.id_user, id_margin]
       );
     }
 
-    await db.execute<ResultSetHeader>(
-      'UPDATE margin_penjualan SET persen = ?, status = ?, iduser = ?, updated_at = NOW() WHERE idmargin_penjualan = ?',
-      [persen, status, session.id_user, id_margin]
-    );
-
     revalidatePath('/dashboard/master/margin');
+    revalidatePath('/dashboard/transaksi/penjualan');
     return { success: true, message: 'Margin penjualan berhasil diperbarui' };
   } catch (error) {
     console.error('Gagal mengubah margin:', error);

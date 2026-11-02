@@ -117,27 +117,27 @@ export async function createPengadaanAction(data: {
     await connection.beginTransaction();
 
     // 1. Simpan Header Pengadaan (Status 'P' = Proses/Diajukan)
+    // Subtotal, PPN, dan Total Nilai dihitung dan diupdate secara otomatis oleh TRIGGER trg_after_insert_detail_pengadaan
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO pengadaan (user_iduser, status, vendor_idvendor, subtotal_nilai, ppn, total_nilai) 
-       VALUES (?, 'P', ?, ?, ?, ?)`,
-      [session.id_user, idvendor, subtotal, ppn, total]
+       VALUES (?, 'P', ?, 0, 0, 0)`,
+      [session.id_user, idvendor]
     );
 
     const idpengadaan = headerResult.insertId;
 
-    // 2. Simpan Item Detail Pengadaan
+    // 2. Simpan Item Detail Pengadaan memanggil Stored Procedure sp_tambah_detail_pengadaan
     for (const item of items) {
-      const itemSubtotal = item.harga_satuan * item.jumlah;
-      await connection.execute<ResultSetHeader>(
-        `INSERT INTO detail_pengadaan (harga_satuan, jumlah, sub_total, idbarang, idpengadaan) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [item.harga_satuan, item.jumlah, itemSubtotal, item.idbarang, idpengadaan]
+      await connection.query(
+        `CALL sp_tambah_detail_pengadaan(?, ?, ?, ?)`,
+        [idpengadaan, item.idbarang, item.harga_satuan, item.jumlah]
       );
     }
 
     await connection.commit();
 
     revalidatePath('/dashboard/transaksi/pengadaan');
+    revalidatePath('/dashboard/transaksi/penerimaan');
     return {
       success: true,
       message: `Pengadaan #${idpengadaan} berhasil dibuat`,
@@ -149,6 +149,22 @@ export async function createPengadaanAction(data: {
     return { success: false, message: 'Gagal membuat transaksi pengadaan' };
   } finally {
     connection.release();
+  }
+}
+
+export async function deleteDetailPengadaanAction(idDetailPengadaan: number) {
+  try {
+    // Hapus detail pengadaan: TRIGGER trg_after_delete_detail_pengadaan akan otomatis update pengadaan
+    await db.execute<ResultSetHeader>(
+      'DELETE FROM detail_pengadaan WHERE iddetail_pengadaan = ?',
+      [idDetailPengadaan]
+    );
+
+    revalidatePath('/dashboard/transaksi/pengadaan');
+    return { success: true, message: 'Item detail pengadaan berhasil dihapus' };
+  } catch (error) {
+    console.error('Gagal menghapus item detail pengadaan:', error);
+    return { success: false, message: 'Gagal menghapus item detail pengadaan' };
   }
 }
 
