@@ -145,4 +145,18 @@ export interface DetailPengadaanPenerimaanItem {
   sudah_diterima: number;
   sisa_belum_diterima: number;
 }
+
+// 15. Kartu Stok (View vu_kartu_stok)
+export interface KartuStokView {
+  id_kartu_stok: number;
+  tanggal_catat: string | Date;
+  id_barang: number;
+  nama_barang: string;
+  nama_satuan: string;
+  jenis_transaksi: 'M' | 'K' | string;
+  id_transaksi: number;
+  masuk: number;
+  keluar: number;
+  stock: number;
+}
 

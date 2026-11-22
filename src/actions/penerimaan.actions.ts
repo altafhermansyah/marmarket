@@ -11,7 +11,6 @@ import {
 import { getSessionAction } from '@/actions/auth.actions';
 import { revalidatePath } from 'next/cache';
 
-// 1. Ambil riwayat penerimaan dari view vu_penerimaan
 export async function getPenerimaanViewAction(): Promise<PenerimaanView[]> {
   try {
     const [rows] = await db.query<RowDataPacket[]>(
@@ -35,7 +34,6 @@ export async function getPenerimaanViewAction(): Promise<PenerimaanView[]> {
   }
 }
 
-// 2. Ambil detail barang dari suatu nota penerimaan
 export async function getDetailPenerimaanViewAction(
   idPenerimaan: number
 ): Promise<DetailPenerimaanView[]> {
@@ -62,7 +60,6 @@ export async function getDetailPenerimaanViewAction(
   }
 }
 
-// 3. Ambil daftar Pengadaan beserta progress penerimaan bertahapnya
 export async function getPengadaanPenerimaanProgressAction(): Promise<
   PengadaanPenerimaanProgressView[]
 > {
@@ -107,7 +104,6 @@ export async function getPengadaanPenerimaanProgressAction(): Promise<
   }
 }
 
-// 4. Ambil pengadaan yang masih memiliki sisa barang untuk diterima (Bisa bertahap)
 export async function getPengadaanSiapTerimaAction(): Promise<
   PengadaanPenerimaanProgressView[]
 > {
@@ -120,7 +116,6 @@ export async function getPengadaanSiapTerimaAction(): Promise<
   }
 }
 
-// 5. Ambil item-item pengadaan untuk proses penerimaan bertahap (menghitung sisa per barang)
 export async function getDetailPengadaanForPenerimaanAction(
   idPengadaan: number
 ): Promise<DetailPengadaanPenerimaanItem[]> {
@@ -167,7 +162,6 @@ export interface CreatePenerimaanItemInput {
   harga_satuan_terima: number;
 }
 
-// 6. Buat transaksi penerimaan barang (Mendukung Penerimaan Bertahap)
 export async function createPenerimaanAction(data: {
   idpengadaan: number;
   items: CreatePenerimaanItemInput[];
@@ -181,7 +175,6 @@ export async function createPenerimaanAction(data: {
 
     const { idpengadaan, items } = data;
 
-    // Filter item yang jumlah terimanya > 0
     const activeItems = (items || []).filter((i) => i.jumlah_terima > 0);
 
     if (activeItems.length === 0) {
@@ -191,7 +184,6 @@ export async function createPenerimaanAction(data: {
       };
     }
 
-    // Validasi sisa belum diterima dari database
     const pendingItems = await getDetailPengadaanForPenerimaanAction(idpengadaan);
     const pendingMap = new Map<number, DetailPengadaanPenerimaanItem>();
     for (const item of pendingItems) {
@@ -216,7 +208,6 @@ export async function createPenerimaanAction(data: {
 
     await connection.beginTransaction();
 
-    // 1. Simpan Header Penerimaan (Status 'S' = Tercatat)
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO penerimaan (status, idpengadaan, iduser) 
        VALUES ('S', ?, ?)`,
@@ -225,10 +216,6 @@ export async function createPenerimaanAction(data: {
 
     const idpenerimaan = headerResult.insertId;
 
-    // 2. Simpan Item Detail Penerimaan memanggil Stored Procedure sp_tambah_detail_penerimaan
-    // TRIGGER trg_after_insert_detail_penerimaan akan otomatis:
-    // A. Menghitung stok baru via fn_cek_stok dan mencatat mutasi 'M' ke kartu_stok
-    // B. Menghitung total_terima vs total_pesan; jika sudah lengkap, otomatis update status pengadaan menjadi 'S' (Selesai)
     for (const item of activeItems) {
       await connection.query(
         `CALL sp_tambah_detail_penerimaan(?, ?, ?, ?)`,

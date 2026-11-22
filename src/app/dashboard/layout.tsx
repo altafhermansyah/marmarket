@@ -49,7 +49,7 @@ export default function DashboardLayout({
     {
       key: '/dashboard',
       icon: <AppstoreOutlined />,
-      label: 'Overview',
+      label: 'Beranda',
     },
     {
       key: 'group-master',
@@ -72,7 +72,6 @@ export default function DashboardLayout({
         { key: '/dashboard/transaksi/pengadaan', label: 'Pengadaan' },
         { key: '/dashboard/transaksi/penerimaan', label: 'Penerimaan' },
         { key: '/dashboard/transaksi/penjualan', label: 'Penjualan' },
-        { key: '/dashboard/transaksi/retur', label: 'Retur' },
         { key: '/dashboard/transaksi/kartu-stok', label: 'Kartu Stok' },
       ],
     },

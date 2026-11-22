@@ -26,6 +26,9 @@ export async function getDashboardStatsAction() {
     const [[penjualanRes]] = await db.query<RowDataPacket[]>(
       'SELECT COUNT(*) AS total, COALESCE(SUM(total_nilai), 0) AS omset FROM vu_penjualan'
     );
+    const [[kartuStokRes]] = await db.query<RowDataPacket[]>(
+      'SELECT COUNT(*) AS total FROM vu_kartu_stok'
+    );
 
     return {
       barangAktif: Number(barangRes?.total || 0),
@@ -36,6 +39,7 @@ export async function getDashboardStatsAction() {
       totalPenerimaan: Number(penerimaanRes?.total || 0),
       totalPenjualan: Number(penjualanRes?.total || 0),
       totalOmset: Number(penjualanRes?.omset || 0),
+      totalMutasi: Number(kartuStokRes?.total || 0),
     };
   } catch (error) {
     console.error('Gagal mengambil statistik dashboard:', error);
@@ -48,6 +52,7 @@ export async function getDashboardStatsAction() {
       totalPenerimaan: 0,
       totalPenjualan: 0,
       totalOmset: 0,
+      totalMutasi: 0,
     };
   }
 }

@@ -76,7 +76,7 @@ export async function getPengadaanByIdAction(
 
 export interface CreatePengadaanItemInput {
   idbarang: number;
-  harga_satuan: number;
+  harga_satuan?: number;
   jumlah: number;
 }
 
@@ -92,32 +92,23 @@ export async function createPengadaanAction(data: {
       return { success: false, message: 'Sesi habis, silakan login kembali' };
     }
 
-    const { idvendor, ppn_percent = 11, items } = data;
+    const { idvendor, items } = data;
 
     if (!items || items.length === 0) {
       return { success: false, message: 'Daftar barang pengadaan tidak boleh kosong' };
     }
 
     for (const item of items) {
-      if (!item.idbarang || item.jumlah <= 0 || item.harga_satuan < 0) {
+      if (!item.idbarang || item.jumlah <= 0) {
         return {
           success: false,
-          message: 'Jumlah barang harus lebih dari 0 dan harga satuan tidak boleh negatif',
+          message: 'Jumlah barang harus lebih dari 0',
         };
       }
     }
 
-    const subtotal = items.reduce(
-      (acc, item) => acc + item.harga_satuan * item.jumlah,
-      0
-    );
-    const ppn = Math.round(subtotal * (ppn_percent / 100));
-    const total = subtotal + ppn;
-
     await connection.beginTransaction();
 
-    // 1. Simpan Header Pengadaan (Status 'P' = Proses/Diajukan)
-    // Subtotal, PPN, dan Total Nilai dihitung dan diupdate secara otomatis oleh TRIGGER trg_after_insert_detail_pengadaan
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO pengadaan (user_iduser, status, vendor_idvendor, subtotal_nilai, ppn, total_nilai) 
        VALUES (?, 'P', ?, 0, 0, 0)`,
@@ -126,11 +117,13 @@ export async function createPengadaanAction(data: {
 
     const idpengadaan = headerResult.insertId;
 
-    // 2. Simpan Item Detail Pengadaan memanggil Stored Procedure sp_tambah_detail_pengadaan
+    // Panggil Stored Procedure sp_tambah_detail_pengadaan (3 parameter: idpengadaan, idbarang, jumlah)
+    // Harga satuan ditarik dari master barang, subtotal dihitung via fn_hitung_subtotal,
+    // dan header pengadaan otomatis di-update oleh SP.
     for (const item of items) {
       await connection.query(
-        `CALL sp_tambah_detail_pengadaan(?, ?, ?, ?)`,
-        [idpengadaan, item.idbarang, item.harga_satuan, item.jumlah]
+        `CALL sp_tambah_detail_pengadaan(?, ?, ?)`,
+        [idpengadaan, item.idbarang, item.jumlah]
       );
     }
 
@@ -154,7 +147,6 @@ export async function createPengadaanAction(data: {
 
 export async function deleteDetailPengadaanAction(idDetailPengadaan: number) {
   try {
-    // Hapus detail pengadaan: TRIGGER trg_after_delete_detail_pengadaan akan otomatis update pengadaan
     await db.execute<ResultSetHeader>(
       'DELETE FROM detail_pengadaan WHERE iddetail_pengadaan = ?',
       [idDetailPengadaan]
@@ -170,7 +162,6 @@ export async function deleteDetailPengadaanAction(idDetailPengadaan: number) {
 
 export async function cancelPengadaanAction(idPengadaan: number) {
   try {
-    // Cek apakah sudah pernah diterima di penerimaan
     const [penerimaanCheck] = await db.query<RowDataPacket[]>(
       'SELECT idpenerimaan FROM penerimaan WHERE idpengadaan = ? LIMIT 1',
       [idPengadaan]

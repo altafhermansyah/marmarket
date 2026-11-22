@@ -526,13 +526,12 @@ export default function PenjualanPage() {
                 </Tag>
               </Flex>
               <Flex align="center" gap={8}>
-                <Text type="secondary">PPN (%):</Text>
+                <Text type="secondary">PPN:</Text>
                 <InputNumber
                   size="small"
-                  min={0}
-                  max={100}
-                  value={ppnPercent}
-                  onChange={(val) => setPpnPercent(val || 0)}
+                  disabled
+                  value={11}
+                  formatter={(val) => `${val}%`}
                   style={{ width: 80 }}
                 />
               </Flex>

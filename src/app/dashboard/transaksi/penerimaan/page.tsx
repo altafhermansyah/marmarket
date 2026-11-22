@@ -17,7 +17,6 @@ import {
   Tabs,
   Progress,
   Badge,
-  Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -546,94 +545,44 @@ export default function PenerimaanPage() {
 
       {/* Modal Terima Barang Bertahap */}
       <Modal
-        title={
-          <Flex align="center" gap={8}>
-            <InboxOutlined style={{ color: '#0284c7', fontSize: 18 }} />
-            <span>
-              Penerimaan Barang: PO #{selectedPengadaan?.id_pengadaan} - {selectedPengadaan?.nama_vendor}
-            </span>
-          </Flex>
-        }
+        title={`Terima Barang (PO #${selectedPengadaan?.id_pengadaan})`}
         open={isReceiveModalOpen}
         onCancel={() => setIsReceiveModalOpen(false)}
         onOk={handleSubmitReceive}
         confirmLoading={submittingReceive}
         okText="Konfirmasi Terima Barang"
         cancelText="Batal"
-        width={900}
+        width={850}
         destroyOnHidden
       >
         {selectedPengadaan && (
-          <Flex vertical gap={16} style={{ marginTop: 12 }}>
-            <Descriptions
-              size="small"
-              bordered
-              column={{ xs: 1, sm: 3 }}
-              items={[
-                {
-                  key: 'po',
-                  label: 'Nomor PO',
-                  children: <Text strong>#{selectedPengadaan.id_pengadaan}</Text>,
-                },
-                {
-                  key: 'vendor',
-                  label: 'Vendor',
-                  children: selectedPengadaan.nama_vendor,
-                },
-                {
-                  key: 'tgl',
-                  label: 'Tanggal PO',
-                  children: formatTanggal(selectedPengadaan.tanggal_pengadaan),
-                },
-                {
-                  key: 'dibuat',
-                  label: 'Dibuat Oleh',
-                  children: selectedPengadaan.dibuat_oleh,
-                },
-                {
-                  key: 'total',
-                  label: 'Total Nilai PO',
-                  children: formatRupiah(selectedPengadaan.total_nilai),
-                },
-                {
-                  key: 'progress',
-                  label: 'Status Saat Ini',
-                  children: (
-                    <Text strong>
-                      {selectedPengadaan.total_item_terima} / {selectedPengadaan.total_item_pesan} item (
-                      {selectedPengadaan.sisa_item} sisa)
-                    </Text>
-                  ),
-                },
-              ]}
-            />
-
-            <Alert
-              type="success"
-              showIcon
-              message={
-                <Flex vertical gap={2}>
-                  <Text strong>Dukungan Penerimaan Bertahap</Text>
-                  <Text style={{ fontSize: 12 }}>
-                    Masukkan jumlah fisik barang yang Anda terima pada tahap ini. Database Stored Procedure (
-                    <Text code>sp_tambah_detail_penerimaan</Text>) dan Trigger (
-                    <Text code>trg_after_insert_detail_penerimaan</Text>) akan otomatis menambah stok masuk ke{' '}
-                    <Text code>kartu_stok</Text> serta mengubah status PO menjadi Selesai jika seluruh barang terpenuhi.
-                  </Text>
-                </Flex>
-              }
-            />
-
-            <Flex justify="space-between" align="center">
-              <Text strong style={{ fontSize: 14 }}>
-                Konfirmasi Item Diterima Tahap Ini:
-              </Text>
+          <Flex vertical gap={12} style={{ marginTop: 8 }}>
+            <Flex
+              justify="space-between"
+              align="center"
+              wrap="wrap"
+              gap={8}
+              style={{
+                padding: '8px 12px',
+                background: '#f4f4f5',
+                borderRadius: 6,
+              }}
+            >
+              <Flex gap={16} wrap="wrap">
+                <Text>
+                  Vendor: <Text strong>{selectedPengadaan.nama_vendor}</Text>
+                </Text>
+                <Text>
+                  Tanggal PO:{' '}
+                  <Text strong>{formatTanggal(selectedPengadaan.tanggal_pengadaan)}</Text>
+                </Text>
+              </Flex>
               <Flex gap={8}>
                 <Button size="small" onClick={handleSetAllRemaining}>
                   Terima Semua Sisa
                 </Button>
                 <Button size="small" onClick={handleResetAllZero}>
-                  Reset Qty ke 0
+                  Reset 0
                 </Button>
               </Flex>
             </Flex>
@@ -649,19 +598,17 @@ export default function PenerimaanPage() {
                 {
                   title: 'No',
                   width: 45,
+                  align: 'center',
                   render: (_, __, idx) => idx + 1,
                 },
                 {
-                  title: 'Barang & Satuan',
+                  title: 'Nama Barang',
                   dataIndex: 'nama_barang',
                   key: 'nama_barang',
                   render: (nama, r) => (
-                    <Flex vertical>
-                      <Text strong>{nama}</Text>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        Satuan: {r.nama_satuan} | ID #{r.id_barang}
-                      </Text>
-                    </Flex>
+                    <Text strong>
+                      {nama} ({r.nama_satuan})
+                    </Text>
                   ),
                 },
                 {
@@ -672,41 +619,18 @@ export default function PenerimaanPage() {
                   align: 'center',
                 },
                 {
-                  title: 'Sudah Diterima',
-                  dataIndex: 'sudah_diterima',
-                  key: 'sudah_diterima',
-                  width: 105,
-                  align: 'center',
-                  render: (val) => (
-                    <Text style={{ color: val > 0 ? '#0284c7' : '#71717a' }}>{val}</Text>
-                  ),
-                },
-                {
-                  title: 'Sisa Belum',
+                  title: 'Sisa',
                   dataIndex: 'sisa_belum_diterima',
                   key: 'sisa_belum_diterima',
-                  width: 95,
+                  width: 85,
                   align: 'center',
-                  render: (val) =>
-                    val > 0 ? (
-                      <Tag color="orange" style={{ margin: 0 }}>
-                        {val}
-                      </Tag>
-                    ) : (
-                      <Tag color="success" style={{ margin: 0 }}>
-                        Lengkap
-                      </Tag>
-                    ),
+                  render: (val) => <Text strong>{val}</Text>,
                 },
                 {
-                  title: (
-                    <Tooltip title="Jumlah barang yang diterima pada pengiriman ini">
-                      <span>Qty Terima Sekarang</span>
-                    </Tooltip>
-                  ),
+                  title: 'Qty Terima',
                   dataIndex: 'jumlah_terima',
                   key: 'jumlah_terima',
-                  width: 130,
+                  width: 120,
                   render: (_, r) => (
                     <InputNumber
                       min={0}
@@ -722,7 +646,7 @@ export default function PenerimaanPage() {
                   title: 'Harga Satuan',
                   dataIndex: 'harga_satuan_terima',
                   key: 'harga_satuan_terima',
-                  width: 130,
+                  width: 150,
                   render: (_, r) => (
                     <InputNumber
                       min={0}
@@ -730,6 +654,7 @@ export default function PenerimaanPage() {
                       onChange={(val) => handlePriceChange(r.id_detail_pengadaan, val)}
                       style={{ width: '100%' }}
                       formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                      parser={(val) => (val ? Number(val.replace(/\./g, '')) : 0)}
                     />
                   ),
                 },
@@ -737,35 +662,21 @@ export default function PenerimaanPage() {
                   title: 'Subtotal',
                   dataIndex: 'sub_total_terima',
                   key: 'sub_total_terima',
-                  width: 130,
+                  width: 140,
+                  align: 'right',
                   render: (val) => <Text strong>{formatRupiah(val)}</Text>,
                 },
               ]}
             />
 
-            {/* Rekapitulasi Tahap Ini */}
-            <Card
-              size="small"
-              style={{
-                backgroundColor: '#f8fafc',
-                border: '1px dashed #cbd5e1',
-              }}
-            >
-              <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
-                <Flex align="center" gap={12}>
-                  <Text type="secondary">Total Qty Diterima Tahap Ini:</Text>
-                  <Tag color="blue" style={{ fontSize: 14, padding: '2px 8px' }}>
-                    {calculateTotalQtyTerima()} Item
-                  </Tag>
-                </Flex>
-                <Flex align="center" gap={12}>
-                  <Text type="secondary">Total Nilai Diterima Tahap Ini:</Text>
-                  <Text strong style={{ fontSize: 16, color: '#16a34a' }}>
-                    {formatRupiah(calculateTotalNilaiTerima())}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Card>
+            <Flex justify="flex-end" gap={24} style={{ marginTop: 8, padding: '4px 8px' }}>
+              <Text>
+                Total Item Diterima: <Text strong>{calculateTotalQtyTerima()}</Text>
+              </Text>
+              <Text>
+                Total Nilai: <Text strong>{formatRupiah(calculateTotalNilaiTerima())}</Text>
+              </Text>
+            </Flex>
           </Flex>
         )}
       </Modal>

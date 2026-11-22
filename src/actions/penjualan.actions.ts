@@ -166,7 +166,6 @@ export async function createPenjualanAction(data: {
 
     await connection.beginTransaction();
 
-    // 1. Cek ketersediaan stok tiap barang menggunakan Function fn_cek_stok
     for (const item of items) {
       if (item.jumlah <= 0) {
         await connection.rollback();
@@ -188,8 +187,6 @@ export async function createPenjualanAction(data: {
       }
     }
 
-    // 2. Simpan Header Penjualan
-    // Nilai subtotal, ppn, dan total_nilai akan dihitung dan diupdate otomatis oleh TRIGGER trg_after_insert_detail_penjualan
     const [headerResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO penjualan (subtotal_nilai, ppn, total_nilai, iduser, idmargin_penjualan) 
        VALUES (0, 0, 0, ?, ?)`,
@@ -198,9 +195,6 @@ export async function createPenjualanAction(data: {
 
     const idpenjualan = headerResult.insertId;
 
-    // 3. Simpan Detail Penjualan menggunakan Stored Procedure sp_tambah_detail_penjualan
-    // Yang otomatis menghitung harga jual via fn_hitung_harga_jual
-    // Dan memicu TRIGGER trg_after_insert_detail_penjualan untuk mencatat mutasi 'K' ke kartu_stok serta update total nota
     for (const item of items) {
       await connection.query(
         `CALL sp_tambah_detail_penjualan(?, ?, ?)`,
@@ -208,7 +202,6 @@ export async function createPenjualanAction(data: {
       );
     }
 
-    // 4. Ambil total_nilai yang telah diupdate oleh trigger
     const [penjualanUpdated] = await connection.query<RowDataPacket[]>(
       'SELECT total_nilai FROM penjualan WHERE idpenjualan = ?',
       [idpenjualan]

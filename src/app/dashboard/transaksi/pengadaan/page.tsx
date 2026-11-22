@@ -568,12 +568,10 @@ export default function PengadaanPage() {
               />
             </Form.Item>
 
-            <Form.Item label="Tarif PPN (%)" style={{ width: 140 }}>
+            <Form.Item label="Tarif PPN" style={{ width: 140 }}>
               <InputNumber
-                min={0}
-                max={100}
-                value={ppnPercent}
-                onChange={(val) => setPpnPercent(val || 0)}
+                disabled
+                value={11}
                 style={{ width: '100%' }}
                 formatter={(val) => `${val}%`}
               />
@@ -626,9 +624,8 @@ export default function PengadaanPage() {
                   <InputNumber
                     placeholder="Harga Satuan"
                     style={{ width: '100%' }}
-                    min={0}
+                    disabled
                     value={item.harga_satuan}
-                    onChange={(val) => handleItemPriceChange(item.key, val)}
                     formatter={(value) =>
                       `Rp ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
                     }
